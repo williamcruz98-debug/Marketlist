@@ -480,6 +480,8 @@ header{position:sticky;top:0;z-index:200;height:56px;background:var(--bg2);borde
     <div class="shop-prog-row"><span id="sp-prog">Progreso</span><strong id="shopProgTxt">0 / 0</strong></div>
     <div class="shop-track"><div class="shop-fill" id="shopFill" style="width:0%"></div></div>
   </div>
+  <div class="hscroll" id="shopCatBar"></div>
+  <div class="hscroll" id="shopStoreBar" style="display:none"></div>
   <div class="shop-sort-bar" id="shopSortBar">
     <span class="shop-sort-lbl" id="ss-sort">Orden:</span>
     <button class="shop-sort-btn active" id="ss-aisle" onclick="setShopSort('aisle')">🛒 <span id="ss-aisle-lbl">Pasillo</span></button>
@@ -1285,6 +1287,19 @@ function toggleShowPending(){
   if(btn) btn.classList.toggle('filter-on', showPendingOnly);
   renderShop();
 }
+var shopStoreFilter='all';
+var shopCatFilter='all';
+
+function setShopCat(cat){
+  shopCatFilter=cat;
+  renderShop();
+}
+
+function setShopStore(s){
+  shopStoreFilter=s;
+  renderShop();
+}
+
 function sortShopItems(arr){
   var a=arr.slice();
   if(shopSort==='name') return a.sort(function(x,y){return x.name.localeCompare(y.name);});
@@ -1432,8 +1447,29 @@ function renderShop(){
   if(config.budget>0&&tot>config.budget){w.style.display='block';w.textContent=t('over-budget')+' ($'+(tot-config.budget).toFixed(2)+')';}
   else w.style.display='none';
 
-  // Apply pending filter
-  var displayItems=showPendingOnly?items.filter(function(i){return!i.checked;}):items;
+  // Category chips
+  var catCounts={all:items.length};
+  Object.keys(CATS).forEach(function(cat){var n=items.filter(function(i){return i.cat===cat;}).length;if(n)catCounts[cat]=n;});
+  if(shopCatFilter!=='all'&&!catCounts[shopCatFilter])shopCatFilter='all';
+  var catHtml='<button class="chip'+(shopCatFilter==='all'?' active':'')+'" onclick="setShopCat(\'all\')">'+(lang==='en'?'All':'Todo')+' <span class="tc">'+catCounts.all+'</span></button>';
+  Object.keys(CATS).forEach(function(k){if(!catCounts[k])return;var v=CATS[k];catHtml+='<button class="chip'+(shopCatFilter===k?' active':'')+'" style="'+(shopCatFilter===k?'border-color:'+v.color+';background:'+v.color+'18;color:'+v.color:'')+'" onclick="setShopCat(\''+k+'\')">'+(catLabel(k).split(' ')[0])+' <span class="tc">'+catCounts[k]+'</span></button>';});
+  document.getElementById('shopCatBar').innerHTML=catHtml;
+
+  // Store chips
+  var usedStores=[];items.forEach(function(i){if(i.store&&usedStores.indexOf(i.store)===-1)usedStores.push(i.store);});
+  var ssb=document.getElementById('shopStoreBar');
+  if(!usedStores.length){ssb.style.display='none';}else{
+    ssb.style.display='flex';
+    var ssh='<button class="chip'+(shopStoreFilter==='all'?' active':'')+'" onclick="setShopStore(\'all\')">'+(lang==='en'?'All':'Todas')+'</button>';
+    usedStores.forEach(function(s){var si=STORES[s]||{label:s,color:'#4b5563'};var isA=shopStoreFilter===s;ssh+='<button class="chip'+(isA?' active':'')+'" style="'+(isA?'border-color:'+si.color+';background:'+si.color+'18;color:'+si.color:'')+'" onclick="setShopStore(\''+s+'\')">'+'<span class="cdot" style="background:'+si.color+'"></span>'+si.label+'</button>';});
+    ssb.innerHTML=ssh;
+  }
+
+  // Apply filters
+  var displayItems=items;
+  if(shopCatFilter!=='all')displayItems=displayItems.filter(function(i){return i.cat===shopCatFilter;});
+  if(shopStoreFilter!=='all')displayItems=displayItems.filter(function(i){return i.store===shopStoreFilter;});
+  if(showPendingOnly)displayItems=displayItems.filter(function(i){return!i.checked;});
   var groups={};sortShopItems(displayItems).forEach(function(it){if(!groups[it.cat])groups[it.cat]=[];groups[it.cat].push(it);});
   var html='';
   var isEn=lang==='en';
