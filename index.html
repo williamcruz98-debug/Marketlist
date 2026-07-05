@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Market List</title>
+<meta name="description" content="Smart bilingual grocery list app">
+<meta name="theme-color" content="#0d1320">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Market List">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -407,6 +415,7 @@ header{position:sticky;top:0;z-index:200;height:56px;background:var(--bg2);borde
       <button class="toggle" id="langToggle" onclick="toggleLang()"></button>
     </div>
     <div class="di" onclick="openConfig();closeDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span id="d-config">Presupuesto y taxes</span></div>
+    <div class="di" id="installBtn" onclick="installApp()" style="display:none;color:var(--acc);border:1.5px dashed var(--acc-mid);border-radius:8px;background:var(--acc-lo);margin-top:0.3rem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span id="d-install">Instalar app</span></div>
   </div>
 </div>
 
@@ -1841,6 +1850,18 @@ function toggleBlock(cat){document.getElementById('block-'+cat).classList.toggle
 var toastT;
 function showToast(m){var el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(function(){el.classList.remove('show');},2400);}
 
+function installApp(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(result){
+      if(result.outcome==='accepted'){
+        document.getElementById('installBtn').style.display='none';
+      }
+      deferredPrompt=null;
+    });
+  }
+}
+
 // ── EVENTS ───────────────────────────────────────────────────
 document.getElementById('addBtn').addEventListener('click',addItem);
 document.getElementById('itemInp').addEventListener('keydown',function(e){if(e.key==='Enter')addItem();});
@@ -1866,6 +1887,28 @@ if(localStorage.getItem('mkt_v1')&&!localStorage.getItem('ml_migrated3')){
 }
 
 applyUI();render();
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js')
+      .then(function(reg){ console.log('SW registered'); })
+      .catch(function(err){ console.log('SW failed:', err); });
+  });
+}
+// PWA install prompt
+var deferredPrompt;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  deferredPrompt = e;
+  var btn = document.getElementById('installBtn');
+  if(btn) btn.style.display = 'flex';
+});
+window.addEventListener('appinstalled', function(){
+  var btn = document.getElementById('installBtn');
+  if(btn) btn.style.display = 'none';
+  showToast(typeof lang !== 'undefined' && lang === 'en' ? '✓ App installed!' : '✓ App instalada!');
+});
 </script>
 </body>
 </html>
