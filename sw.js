@@ -1,18 +1,18 @@
-const CACHE = 'market-list-v1';
+const CACHE = 'market-list-v2';
+const BASE = '/Marketlist';
 
-// Install: cache only what we know exists
 self.addEventListener('install', function(e) {
   e.waitUntil(
     caches.open(CACHE).then(function(cache) {
-      // Cache the page itself using current location
-      return cache.add(self.location.href.replace('sw.js', 'index.html'))
-        .catch(function() { return; }); // fail silently if can't cache
+      return cache.addAll([
+        BASE + '/',
+        BASE + '/index.html'
+      ]).catch(function() { return; });
     })
   );
   self.skipWaiting();
 });
 
-// Activate: clean old caches
 self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
@@ -25,7 +25,6 @@ self.addEventListener('activate', function(e) {
   self.clients.claim();
 });
 
-// Fetch: network first, fallback to cache
 self.addEventListener('fetch', function(e) {
   if(e.request.method !== 'GET') return;
   if(!e.request.url.startsWith('http')) return;
@@ -42,7 +41,10 @@ self.addEventListener('fetch', function(e) {
         return response;
       })
       .catch(function() {
-        return caches.match(e.request);
+        return caches.match(e.request)
+          .then(function(cached) {
+            return cached || caches.match(BASE + '/index.html');
+          });
       })
   );
 });

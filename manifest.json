@@ -2,20 +2,21 @@
   "name": "Market List",
   "short_name": "Market List",
   "description": "Smart bilingual grocery list app",
-  "start_url": "/",
+  "start_url": "/Marketlist/index.html",
+  "scope": "/Marketlist/",
   "display": "standalone",
   "background_color": "#080c14",
   "theme_color": "#0d1320",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "/Marketlist/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512.png",
+      "src": "/Marketlist/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
