@@ -561,6 +561,15 @@ header{position:sticky;top:0;z-index:200;height:56px;background:var(--bg2);borde
     <div class="mtitle" id="cfg-title">Presupuesto y Taxes</div>
     <div class="mf"><div class="ml" id="cfg-budget">Límite de presupuesto ($)</div><input class="mi" id="cfgBudget" type="number" min="0" step="1" placeholder="0 = sin límite"></div>
     <div class="mf"><div class="ml" id="cfg-tax">Tasa de tax (%)</div><input class="mi" id="cfgTax" type="number" min="0" max="25" step="0.1" value="2.5"><div class="mhint" id="cfg-hint">Virginia: <strong>2.5%</strong> groceries · <strong>6%</strong> general · <strong>11.1%</strong> comida preparada</div></div>
+    <div class="mf">
+      <div class="ml" id="cfg-stores-lbl">Tiendas activas</div>
+      <div id="storeToggles" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.5rem"></div>
+      <div style="display:flex;gap:0.4rem;margin-top:0.6rem">
+        <input class="mi" id="newStoreName" type="text" placeholder="Nombre de tienda..." style="flex:1">
+        <input class="mi" id="newStoreColor" type="color" value="#6366f1" style="width:44px;padding:0.3rem;cursor:pointer;border-radius:8px">
+        <button class="mbtn save" style="flex:0;padding:0 0.9rem;white-space:nowrap" onclick="addCustomStore()">+ Agregar</button>
+      </div>
+    </div>
     <div class="mbtns"><button class="mbtn cancel" id="cfg-cancel" onclick="closeOverlay('configModal')">Cancelar</button><button class="mbtn save" id="cfg-save" onclick="saveConfigModal()">Guardar</button></div>
   </div>
 </div>
@@ -613,7 +622,7 @@ var T = {
     'paste-lbl':'Un producto por línea. Acepta "2 lb pollo", "zanahoria", etc.',
     'paste-cancel':'Cancelar','paste-ok':'Importar y categorizar',
     'io-close':'Cerrar',
-    'cfg-title':'Presupuesto y Taxes','cfg-budget':'Límite de presupuesto ($)',
+    'cfg-title':'Presupuesto y Taxes','cfg-budget':'Límite de presupuesto ($)','cfg-stores-lbl':'Tiendas activas',
     'cfg-tax':'Tasa de tax (%)','cfg-hint':'Virginia: 2.5% groceries · 6% general · 11.1% comida preparada',
     'cfg-cancel':'Cancelar','cfg-save':'Guardar',
     'nl-title':'Nueva lista','nl-lbl':'Nombre','nl-cancel':'Cancelar','nl-create':'Crear',
@@ -668,7 +677,7 @@ var T = {
     'paste-lbl':'One item per line. Accepts "2 lb chicken", "carrots", etc.',
     'paste-cancel':'Cancel','paste-ok':'Import & categorize',
     'io-close':'Close',
-    'cfg-title':'Budget & Taxes','cfg-budget':'Budget limit ($)',
+    'cfg-title':'Budget & Taxes','cfg-budget':'Budget limit ($)','cfg-stores-lbl':'Active stores',
     'cfg-tax':'Tax rate (%)','cfg-hint':'Virginia: 2.5% groceries · 6% general · 11.1% prepared food',
     'cfg-cancel':'Cancel','cfg-save':'Save',
     'nl-title':'New list','nl-lbl':'Name','nl-cancel':'Cancel','nl-create':'Create',
@@ -739,7 +748,30 @@ function toggleLang() {
 document.documentElement.setAttribute('data-theme', theme);
 
 // ── DATA ──────────────────────────────────────────────────────
-var STORES = {walmart:{label:'Walmart',color:'#0071ce'},aldi:{label:'Aldi',color:'#00529f'},wholefoods:{label:'Whole Foods',color:'#00674b'},costco:{label:'Costco',color:'#005daa'},target:{label:'Target',color:'#cc0000'},otra:{label:'Other',color:'#4b5563'}};
+var DEFAULT_STORES = {
+  walmart:    {label:'Walmart',    color:'#0071ce', builtin:true},
+  aldi:       {label:'Aldi',       color:'#00529f', builtin:true},
+  wholefoods: {label:'Whole Foods',color:'#00674b', builtin:true},
+  costco:     {label:'Costco',     color:'#005daa', builtin:true},
+  target:     {label:'Target',     color:'#cc0000', builtin:true},
+  otra:       {label:'Other',      color:'#4b5563', builtin:true}
+};
+// Load disabled stores and custom stores from localStorage
+var disabledStores = JSON.parse(localStorage.getItem('ml_disabled_stores')||'[]');
+var customStores   = JSON.parse(localStorage.getItem('ml_custom_stores')||'[]');
+
+function buildStores(){
+  var s = {};
+  Object.keys(DEFAULT_STORES).forEach(function(k){
+    if(disabledStores.indexOf(k)===-1) s[k]=DEFAULT_STORES[k];
+  });
+  customStores.forEach(function(cs){
+    if(disabledStores.indexOf(cs.id)===-1) s[cs.id]={label:cs.label,color:cs.color,custom:true};
+  });
+  return s;
+}
+var STORES = buildStores();
+function refreshStores(){ STORES=buildStores(); }
 var CATS = {verduras:{color:'#34d399',order:1},carnes:{color:'#fb7185',order:2},lacteos:{color:'#5b8df6',order:3},panaderia:{color:'#fbbf24',order:4},bebidas:{color:'#22d3ee',order:5},enlatados:{color:'#f97316',order:6},granos:{color:'#a3e635',order:7},condimentos:{color:'#f472b6',order:8},limpieza:{color:'#c084fc',order:9},otros:{color:'#64748b',order:10}};
 function catLabel(k){return t('cat-'+k)||k;}
 
@@ -1028,11 +1060,98 @@ function saveToHistory(){
 }
 
 // ── CONFIG ───────────────────────────────────────────────────
-function openConfig(){document.getElementById('cfgBudget').value=config.budget||'';document.getElementById('cfgTax').value=config.taxRate;document.getElementById('configModal').classList.add('open');}
+function openConfig(){
+  document.getElementById('cfgBudget').value=config.budget||'';
+  document.getElementById('cfgTax').value=config.taxRate;
+  renderStoreToggles();
+  document.getElementById('configModal').classList.add('open');
+}
+function renderStoreToggles(){
+  var container=document.getElementById('storeToggles');
+  container.innerHTML='';
+  function makeRow(id, label, color, isOn, isCustom){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:0.3rem 0;border-top:1px solid var(--border)';
+    var left=document.createElement('div');
+    left.style.cssText='display:flex;align-items:center;gap:0.5rem';
+    var dot=document.createElement('div');
+    dot.style.cssText='width:10px;height:10px;border-radius:50%;background:'+color;
+    var lbl=document.createElement('span');
+    lbl.style.cssText='font-size:0.82rem;color:var(--txt2)';
+    lbl.textContent=label;
+    left.appendChild(dot);left.appendChild(lbl);
+    var right=document.createElement('div');
+    right.style.cssText='display:flex;gap:0.4rem;align-items:center';
+    var tog=document.createElement('button');
+    tog.className='toggle'+(isOn?' on':'');
+    tog.addEventListener('click',function(){toggleStoreEnabled(id,tog);});
+    right.appendChild(tog);
+    if(isCustom){
+      var del=document.createElement('button');
+      del.style.cssText='background:var(--red-lo);border:none;color:var(--red);border-radius:5px;padding:0.18rem 0.5rem;font-size:0.7rem;cursor:pointer';
+      del.textContent='✕';
+      del.addEventListener('click',function(){deleteCustomStore(id);});
+      right.appendChild(del);
+    }
+    row.appendChild(left);row.appendChild(right);
+    container.appendChild(row);
+  }
+  Object.keys(DEFAULT_STORES).forEach(function(k){
+    var s=DEFAULT_STORES[k];
+    makeRow(k,s.label,s.color,disabledStores.indexOf(k)===-1,false);
+  });
+  customStores.forEach(function(cs){
+    makeRow(cs.id,cs.label,cs.color,disabledStores.indexOf(cs.id)===-1,true);
+  });
+}
+function toggleStoreEnabled(id, btn){
+  var idx=disabledStores.indexOf(id);
+  if(idx===-1){ disabledStores.push(id); btn.classList.remove('on'); }
+  else{ disabledStores.splice(idx,1); btn.classList.add('on'); }
+  localStorage.setItem('ml_disabled_stores',JSON.stringify(disabledStores));
+  refreshStores();
+}
+function addCustomStore(){
+  var name=document.getElementById('newStoreName').value.trim();
+  var color=document.getElementById('newStoreColor').value;
+  if(!name){ showToast(lang==='en'?'Enter a store name':'Escribe un nombre'); return; }
+  var id='custom_'+Date.now();
+  customStores.push({id:id,label:name,color:color});
+  localStorage.setItem('ml_custom_stores',JSON.stringify(customStores));
+  document.getElementById('newStoreName').value='';
+  refreshStores();
+  renderStoreToggles();
+  // Also update store selects
+  updateStoreSelects();
+  showToast('"'+name+'" '+(lang==='en'?'added':'agregada'));
+}
+function deleteCustomStore(id){
+  customStores=customStores.filter(function(s){return s.id!==id;});
+  localStorage.setItem('ml_custom_stores',JSON.stringify(customStores));
+  disabledStores=disabledStores.filter(function(s){return s!==id;});
+  localStorage.setItem('ml_disabled_stores',JSON.stringify(disabledStores));
+  refreshStores();
+  renderStoreToggles();
+  updateStoreSelects();
+}
+function updateStoreSelects(){
+  // Update all store selects in the app
+  ['storeSel','eStore'].forEach(function(selId){
+    var sel=document.getElementById(selId);
+    if(!sel)return;
+    var current=sel.value;
+    var opts='<option value="">'+(lang==='en'?'Store':'Tienda')+'</option>';
+    Object.keys(STORES).forEach(function(k){
+      opts+='<option value="'+k+'"'+(k===current?' selected':'')+'>'+STORES[k].label+'</option>';
+    });
+    sel.innerHTML=opts;
+  });
+}
 function saveConfigModal(){
   config.budget=parseFloat(document.getElementById('cfgBudget').value)||0;
   config.taxRate=parseFloat(document.getElementById('cfgTax').value)||2.5;
   localStorage.setItem('ml_config',JSON.stringify(config));
+  refreshStores(); updateStoreSelects();
   closeOverlay('configModal');render();showToast(t('cfg-saved'));
 }
 
