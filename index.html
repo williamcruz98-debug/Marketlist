@@ -1213,20 +1213,48 @@ function selectSugg(name){
 
 // ── PASTE ────────────────────────────────────────────────────
 function openPasteModal(){document.getElementById('pasteArea').value='';document.getElementById('pasteModal').classList.add('open');}
+function parsePasteLine(line){
+  var s=line.trim(); if(!s) return null;
+  var umap={'lbs':'lb','lb':'lb','libra':'lb','libras':'lb','pound':'lb','pounds':'lb',
+    'kg':'kg','kilo':'kg','kilos':'kg','kilogram':'kg','kilograms':'kg',
+    'g':'g','gr':'g','gram':'g','grams':'g','gramo':'g','gramos':'g',
+    'l':'L','lt':'L','liter':'L','liters':'L','litro':'L','litros':'L',
+    'ml':'ml','mililitro':'ml','mililitros':'ml',
+    'bolsa':'bolsa','bolsas':'bolsa','bag':'bolsa','bags':'bolsa',
+    'caja':'caja','cajas':'caja','box':'caja','boxes':'caja',
+    'lata':'lata','latas':'lata','can':'lata','cans':'lata',
+    'doc':'doc','docena':'doc','dozen':'doc',
+    'und':'und','unidad':'und','unidades':'und','unit':'und','units':'und',
+    'pza':'und','pieza':'und','piezas':'und','piece':'und','pieces':'und',
+    'paquete':'und','paquetes':'und','pack':'und','packs':'und'
+  };
+  var qty=1,unit='und',name=s,m,u;
+  // "Pollo 1.5 lbs" or "Tomates 2 bolsas"
+  m=s.match(/^(.+?)\s+([\d.,]+)\s*([a-záéíóúüña-z]+)\.?$/i);
+  if(m&&(u=umap[m[3].toLowerCase()])){return{name:m[1].trim(),qty:parseFloat(m[2].replace(',','.'))||1,unit:u};}
+  // "1.5 lbs Pollo" or "2 bolsas de leche"
+  m=s.match(/^([\d.,]+)\s*([a-záéíóúüña-z]+)\.?\s+(?:de\s+)?(.+)$/i);
+  if(m&&(u=umap[m[2].toLowerCase()])){return{name:m[3].trim(),qty:parseFloat(m[1].replace(',','.'))||1,unit:u};}
+  // "Pollo 1.5" (no unit)
+  m=s.match(/^(.+?)\s+([\d.,]+)$/);
+  if(m){return{name:m[1].trim(),qty:parseFloat(m[2].replace(',','.'))||1,unit:'und'};}
+  // just name
+  return{name:s,qty:1,unit:'und'};
+}
+
 function processPaste(){
   var text=document.getElementById('pasteArea').value.trim();
   if(!text){showToast(t('nothing-to-paste'));return;}
   var lines=text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length>1;});
   var added=0;
   lines.forEach(function(line){
-    var qty=1,unit='und',name=line;
-    var m=line.match(/^([\d.]+)\s*(lb|kg|g|L|ml|und|bolsa|caja|lata|doc)?\s+(?:de\s+)?(.+)$/i);
-    if(m){qty=parseFloat(m[1])||1;unit=(m[2]||'und').toLowerCase();name=m[3];}
-    var mu=recallUnit(name);if(mu)unit=mu;
-    var ms=recallStore(name);var price=recallPrice(name);
+    var p=parsePasteLine(line); if(!p) return;
+    var name=p.name, qty=p.qty, unit=p.unit;
+    var mu=recallUnit(name); if(mu) unit=mu;
+    var ms=recallStore(name); var price=recallPrice(name);
     var info=lookupPDB(name);
     getItems().push({id:genId(),name:name,nameEn:info?info.en:'',likelyStores:info?info.stores:[],qty:qty,unit:unit,price:price,store:ms,cat:detectCat(name),checked:false,unavail:false});
-    trackFreq(name);added++;
+    trackFreq(name); added++;
   });
   save();closeOverlay('pasteModal');render();showToast(added+' '+t('paste-done'));
 }
